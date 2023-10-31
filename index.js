@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
 const app = express();
@@ -7,8 +9,35 @@ const port = process.env.PORT || 5000;
 
 
 // middleware
-app.use(cors());
+app.use(cors(
+  {
+    origin:['http://localhost:5173'],
+    credentials: true
+  }
+));
 app.use(express.json());
+app.use(cookieParser());
+
+// selfmade middleware
+const verifyToken = async(req,res,next) =>{
+  const token = req.cookies?.token;
+  if(!token){
+    return res.status(401).send({message:'unAuthorized'})
+  }
+
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRETE, (err,decoded) => {
+    if(err){
+      return  res.status(401).send({message:'unAuthorized'})
+    }
+
+    // console.log('value in token', decoded)
+   
+    req.user = decoded;
+    next();
+
+  })
+
+}
 
 
 console.log(process.env.DB_USER)
@@ -35,12 +64,35 @@ async function run() {
    const serviceCollection = client.db('carDoctor').collection('services');
    const bookingCollection = client.db('carDoctor').collection('bookings');
 
+  //  to generate token using jwt
+  app.post('/jwt', async(req,res) =>{
+    const user = req.body;
+    console.log(user);
+    const token = jwt.sign(user,process.env.ACCESS_TOKEN_SECRETE,{expiresIn:'1h'});
+    console.log(token)
+    res
+    .cookie('token', token, {
+      httpOnly: true,
+      secure: false,
+      // sameSite: 'none'
+    })
+    .send({success:true})
+    console.log(user)
+  })
 
     //  to make a link for bookings according to a specific email wala user
 
-    app.get('/bookings', async(req, res)=>{
+    app.get('/bookings', verifyToken, async(req, res) =>{
+
+        // checking if the users token match with its actual owner or not
+        if(req.query.email !== req.user.email){
+          return  res.status(401).send({message:'unAuthorized'})
+        }
+  
 
       let query = {};
+      
+  
       if(req.query?.email){
         query = {email: req.query.email}
       }
@@ -48,6 +100,7 @@ async function run() {
       const cursor = bookingCollection.find(query);
       const result = await cursor.toArray();
       res.send(result);
+      console.log('tokennnn' ,req.cookies.token)
     })
 
   
