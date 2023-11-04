@@ -11,7 +11,12 @@ const port = process.env.PORT || 5000;
 // middleware
 app.use(cors(
   {
-    origin:['http://localhost:5173'],
+    origin:[
+      // 'http://localhost:5173'
+      'https://simple-firebase-26194.web.app',
+      'https://simple-firebase-26194.firebaseapp.com',
+      'https://simple-firebase-26194.web.app'
+    ],
     credentials: true
   }
 ));
@@ -59,12 +64,12 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
    const serviceCollection = client.db('carDoctor').collection('services');
    const bookingCollection = client.db('carDoctor').collection('bookings');
 
-  //  to generate token using jwt
+  //  to generate token using jwt FOR SIGN IN 
   app.post('/jwt', async(req,res) =>{
     const user = req.body;
     console.log(user);
@@ -73,13 +78,22 @@ async function run() {
     res
     .cookie('token', token, {
       httpOnly: true,
-      secure: false,
+      // secure: false,
       // sameSite: 'none'
     })
     .send({success:true})
     console.log(user)
   })
 
+  // TO CHECK WHICH USER LOGGED OUT
+
+  app.post('/logout', async(req, res) =>{
+      const user = req.body;
+      console.log('LOGGESD OUT USER')
+
+      // to clear logged users cookie while logging out
+       res.clearCookie('token', {maxAge:0}).send({success:true})
+  })
     //  to make a link for bookings according to a specific email wala user
 
     app.get('/bookings', verifyToken, async(req, res) =>{
